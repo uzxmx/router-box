@@ -1,0 +1,48 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+def get_router_vm_bridged_adapter
+  id_path = '../.vagrant/machines/default/virtualbox/id'
+  adapter_name = nil
+  gateway = nil
+  if File.exist?(id_path)
+    id = File.open(id_path) { |io| io.read }
+    output = %x[VBoxManage showvminfo "#{id}" --machinereadable 2>&1]
+    output.lines.find do |line|
+      if md = /^bridgeadapter2="(.+)"$/.match(line.chomp)
+        adapter_name = md[1]
+      end
+    end
+
+    output = %x[VBoxManage guestproperty get "#{id}" /VirtualBox/GuestInfo/Net/1/V4/IP 2>&1]
+    output.lines.find do |line|
+      if md = /^Value: *(.+)$/.match(line.chomp)
+        gateway = md[1]
+      end
+    end
+  end
+  if adapter_name.nil?
+    puts 'Router VM has not been properly initialized.'
+    exit 1
+  end
+  if gateway.nil?
+    puts 'Cannot get gateway address.'
+    exit 1
+  end
+  [adapter_name, gateway]
+end
+
+bridged_adapter, gateway = get_router_vm_bridged_adapter
+
+Vagrant.configure('2') do |config|
+  config.vm.box = 'uzxmx/mybox'
+
+  config.vm.network :public_network, bridge: bridged_adapter
+
+  config.vm.provision :shell, run: :always, inline: <<-EOF
+    # Delete the default route of the NAT adapter.
+    ip route del default dev eth0
+    # Add a default route via the gateway acted by the router VM.
+    ip route add default via #{gateway} dev eth1
+  EOF
+end
