@@ -43,57 +43,59 @@ def get_network_adapters
   network_adapters
 end
 
-if ENV['RESET_BRIDGE'] == '1' || !(bridged_adapter_name = is_bridged)
-  network_adapters = get_network_adapters
-  if network_adapters.size > 1
-    puts 'Available network interfaces to bridge to:'
-    puts network_adapters.map.with_index(1) { |na, idx| "#{idx}. #{na.name}" }
-    input = nil
-    loop do
-      print 'Please input a number: '
-      input = STDIN.gets.chomp.to_i
-      break if input > 0 && input <= network_adapters.size
-    end
-  elsif network_adapters.size == 1
-    input = 1
-  else
-    puts 'No network adapter found'
-    exit 1
-  end
-  selected_network_adapter = network_adapters[input - 1]
-end
+# if ENV['RESET_BRIDGE'] == '1' || !(bridged_adapter_name = is_bridged)
+#   network_adapters = get_network_adapters
+#   if network_adapters.size > 1
+#     puts 'Available network interfaces to bridge to:'
+#     puts network_adapters.map.with_index(1) { |na, idx| "#{idx}. #{na.name}" }
+#     input = nil
+#     loop do
+#       print 'Please input a number: '
+#       input = STDIN.gets.chomp.to_i
+#       break if input > 0 && input <= network_adapters.size
+#     end
+#   elsif network_adapters.size == 1
+#     input = 1
+#   else
+#     puts 'No network adapter found'
+#     exit 1
+#   end
+#   selected_network_adapter = network_adapters[input - 1]
+# end
 
 Vagrant.configure('2') do |config|
   config.vm.box = 'uzxmx/mybox'
   config.ssh.forward_agent = true
 
-  if selected_network_adapter
-    # Specify a host NIC that you want to bridge to by using `bridge` option. The
-    # NIC should already connect to the Internet. The bridged IP address will be
-    # the gateway (router) address for other devices that want to connect to the
-    # Internet. You can specify a fixed ip address by using `ip` option.
-    config.vm.network :public_network, bridge: selected_network_adapter.name
-
-    config.vm.provider :virtualbox do |vb|
-      # Change the promiscuous mode of the second NIC. We also need to do this again in the VM.
-      vb.customize ['modifyvm', :id, '--nicpromisc2', 'allow-all']
-
-      # When client device sends ARP request to get the mac address of the router
-      # VM, it's the mac address of the bridged NIC that will be returned. So the
-      # destination mac address of the incoming packet will be the mac address of
-      # the bridged NIC. The router VM will drop such packet because it thinks
-      # that packet is not for it (PACKET_OTHERHOST, also see net/ipv4/ip_input.c).
-      #
-      # To avoid this issue, We must change the mac address of the second NIC to the
-      # mac address of the bridged NIC.
-      vb.customize ['modifyvm', :id, '--macaddress2', selected_network_adapter.mac_address.gsub(':', '')]
-    end
-  else
-    # We must specify the `public_network` every time, otherwise Vagrant will
-    # disable the second NIC. And we also need to specify the bridged adapter
-    # name, otherwise Vagrant will ask us to select a network interface again.
-    config.vm.network :public_network, bridge: bridged_adapter_name
-  end
+  # if selected_network_adapter
+  #   # Specify a host NIC that you want to bridge to by using `bridge` option. The
+  #   # NIC should already connect to the Internet. The bridged IP address will be
+  #   # the gateway (router) address for other devices that want to connect to the
+  #   # Internet. You can specify a fixed ip address by using `ip` option.
+  #   config.vm.network :public_network, bridge: selected_network_adapter.name
+  #
+  #   config.vm.provider :virtualbox do |vb|
+  #     vb.memory = 6 * 1024
+  #     vb.cpus = 4
+  #     # Change the promiscuous mode of the second NIC. We also need to do this again in the VM.
+  #     vb.customize ['modifyvm', :id, '--nicpromisc2', 'allow-all']
+  #
+  #     # When client device sends ARP request to get the mac address of the router
+  #     # VM, it's the mac address of the bridged NIC that will be returned. So the
+  #     # destination mac address of the incoming packet will be the mac address of
+  #     # the bridged NIC. The router VM will drop such packet because it thinks
+  #     # that packet is not for it (PACKET_OTHERHOST, also see net/ipv4/ip_input.c).
+  #     #
+  #     # To avoid this issue, We must change the mac address of the second NIC to the
+  #     # mac address of the bridged NIC.
+  #     vb.customize ['modifyvm', :id, '--macaddress2', selected_network_adapter.mac_address.gsub(':', '')]
+  #   end
+  # else
+  #   # We must specify the `public_network` every time, otherwise Vagrant will
+  #   # disable the second NIC. And we also need to specify the bridged adapter
+  #   # name, otherwise Vagrant will ask us to select a network interface again.
+  #   # config.vm.network :public_network, bridge: bridged_adapter_name
+  # end
 
   config.vm.provision :shell, inline: <<-EOF
     # Enable Linux kernel ip forwarding permanently. This is the key to

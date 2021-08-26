@@ -73,6 +73,14 @@ sudo tcpdump -i eth1 src <YOUR-MOBILE-DEVICE-IP> or dst <YOUR-MOBILE-DEVICE-IP>
 Use your device to visit some websites. If you see some packets dumped, then
 your router VM is working.
 
+```
+# For mac osx, get current gateway address:
+route -n get default
+
+# For linux,
+ip route show dev eth0
+```
+
 ## License
 
 [MIT License](LICENSE)
